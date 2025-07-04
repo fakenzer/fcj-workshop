@@ -1,0 +1,57 @@
+<style type="text/css">
+  #TableOfContents {
+    font-size: 13px !important;
+    max-height: 85vh;
+    overflow: auto;
+    padding: 0px !important;
+  }
+
+  #TableOfContents > ul {
+    margin-top: 0px;
+    margin-bottom: 16px;
+  }
+
+  #TableOfContents > ul > li > ul > li > ul li {
+    margin-right: 8px;
+  }
+
+  #TableOfContents > ul > li > a {
+    font-weight: bold;
+    padding: 0 18px 0 4px;
+    margin: 0 2px;
+  }
+
+  #TableOfContents > ul > li > ul > li > a {
+    font-weight: bold;
+  }
+
+  #TableOfContents > ul > li > ul > li > ul > li > ul > li > ul > li {
+    display: none;
+  }
+
+  #TableOfContents li:not(:has(a)) {
+    list-style-type: none;
+  }
+
+  #TableOfContents li {
+    list-style-type: none;
+  }
+  #TableOfContents li:has(> a) {
+    list-style-type: disc;
+  }
+
+  #TableOfContents ul {
+    padding-left: 0;
+  }
+  #TableOfContents ul:has(> li > a) {
+    padding-left: 40px;
+  }
+
+  p:has(+ nav) {
+    display: none;
+  }
+  p:has(+ nav > ul) {
+    display: block;
+    margin-bottom: 12px;
+  }
+</style>

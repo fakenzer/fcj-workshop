@@ -1,0 +1,23 @@
+{{ partial "header.html" . }}
+
+{{ if eq .Kind "section" }}
+	{{ .Content }}
+
+  {{if .Pages}}
+    <h3 id="content">{{T "Content"}}</h3>
+    <ol>
+      {{ range .Pages }}
+        <li><a href="{{.RelPermalink}}">{{.Title}}</a></li>
+      {{ end }}
+    </ol>
+  {{end}}
+{{end}}
+
+<footer class=" footline" >
+	{{with .Params.LastModifierDisplayName}}
+	    <i class='fas fa-user'></i> <a href="mailto:{{ $.Params.LastModifierEmail }}">{{ . }}</a> {{with $.Date}} <i class='fas fa-calendar'></i> {{ .Format "02/01/2006" }}{{end}}
+	    </div>
+	{{end}}
+</footer> 
+
+{{ partial "footer.html" . }}

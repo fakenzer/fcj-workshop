@@ -1,0 +1,57 @@
+# Change the default theme to be use when building the site with Hugo
+theme         = "hugo-theme-learn"
+enableGitInfo = true
+
+# For search functionality
+[outputs]
+home = [ "HTML", "RSS", "JSON" ]
+
+[params]
+# Change default color scheme with a variant one. Can be "red", "blue", "green".
+themeVariant = "workshop"
+# Git hub repo link
+editURL           = ""
+description       = ""
+author            = "journeyoftheaverageguy@gmail.com"
+showVisitedLinks  = true
+disableBreadcrumb = false
+disableNextPrev   = false
+
+[Languages]
+[Languages.en]
+# TODO: Update workshop title (English)
+title        = "AWS System Manager"
+weight       = 1
+languageName = "English"
+
+[[Languages.en.menu.shortcuts]]
+name       = "<i class='fab fa-facebook'></i> AWS Study Group"
+identifier = "AWS Study Group FB"
+url        = "https://www.facebook.com/groups/awsstudygroupfcj/"
+weight     = 20
+
+[Languages.vi]
+# TODO: Update workshop title (Vietnamese)
+title        = "AWS System Manager"
+weight       = 2
+languageName = "Tiếng Việt"
+
+[[Languages.vi.menu.shortcuts]]
+name       = "<i class='fab fa-facebook'></i> AWS Study Group"
+identifier = "AWS Study Group FB"
+url        = "https://www.facebook.com/groups/awsstudygroupfcj/"
+weight     = 20
+
+[markup]
+[markup.goldmark]
+[markup.goldmark.parser]
+[markup.goldmark.parser.attribute]
+block = true
+
+[markup.tableOfContents]
+endLevel   = 6
+ordered    = false
+startLevel = 2
+
+[frontmatter]
+lastmod = [ "lastmod", ":git", "date", "publishDate" ]

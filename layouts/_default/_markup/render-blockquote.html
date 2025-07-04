@@ -1,0 +1,18 @@
+{{ $emojis := dict
+  "caution" ":exclamation:"
+  "important" ":information_source:"
+  "note" ":information_source:"
+  "tip" ":bulb:"
+  "warning" ":information_source:"
+}}
+
+{{ if eq .Type "alert" }}
+  {{ $alertClass := .AlertType }}
+  {{ if eq .AlertType "important" }}{{ $alertClass = "info" }}{{ end }}
+  {{ if eq .AlertType "caution" }}{{ $alertClass = "warning" }}{{ end }}
+  <div class="notices {{ $alertClass }}">{{ .Text }}</div>
+{{ else }}
+  <blockquote>
+    {{ .Text }}
+  </blockquote>
+{{ end }}
