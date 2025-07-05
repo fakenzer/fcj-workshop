@@ -3,7 +3,7 @@
 TODO: Remove images from the example workshop
 
 ```
-2.prerequisite
+2.IAM
 3.connect
 4.s3
 5.fwd
