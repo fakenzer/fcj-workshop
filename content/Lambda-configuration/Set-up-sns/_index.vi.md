@@ -1,11 +1,11 @@
 ---
 title: "Cấu hình Resource Management Alerts"
-weight: 5
+weight: 2
 chapter: false
-pre: " <b> 3.5. </b> "
+pre: " <b> 3.2. </b> "
 ---
 
-Chương này hướng dẫn chi tiết cách thiết lập SNS Topic và Subscription để nhận thông báo email cho việc quản lý tài nguyên AWS.
+Phần này hướng dẫn chi tiết cách thiết lập SNS Topic và Subscription để nhận thông báo email cho việc quản lý tài nguyên AWS.
 
 ## Mục tiêu
 
@@ -48,12 +48,19 @@ Sau khi hoàn thành chương này, bạn sẽ có:
    - **Topic ARN**: Sẽ được tự động điền
    - **Protocol**: Chọn **Email**
    - **Endpoint**: Nhập `your-email@gmail.com`
+     {{%notice note%}}
+     Thay thế `your-email@gmail.com` bằng Account ID thực tế của bạn và thay thế `your-region` bằng region bạn dùng.
+     {{%/notice%}}
 4. Nhấp **Create subscription**
    ![Create Subscriptions](/images/3.Lambda/010-subscriptions.png)
 
+   {{%notice note%}}
+   Thay thế `your-email@gmail.com` bằng Account ID thực tế của bạn.
+   {{%/notice%}}
+
 ### Bước 4: Xác nhận Email Subscription
 
-1. Kiểm tra hộp thư email your-email@gmail.com
+1. Kiểm tra hộp thư email
 2. Tìm email từ **AWS Notifications**
 3. Nhấp vào link **Confirm subscription** trong email
 4. Quay lại AWS Console để kiểm tra status subscription đã chuyển thành **Confirmed**

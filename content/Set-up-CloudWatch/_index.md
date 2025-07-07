@@ -7,7 +7,7 @@ pre: " <b> 6. </b> "
 
 ## Introduction
 
-CloudWatch Dashboard is a visual monitoring tool that helps track the performance and status of AWS resources in real-time. This guide will help you create a complete dashboard for resource management.
+CloudWatch Dashboard is a visual monitoring tool that helps track the performance and status of AWS resources in real-time. This guide will help you create a comprehensive dashboard for resource management.
 
 ## Objectives
 
@@ -42,7 +42,7 @@ Create a dashboard named `ResourceManagement` to monitor:
    - **Dashboard name**: `ResourceManagement`
    - Click **Create dashboard**
 
-2. **Select Widget Type**
+2. **Choose Widget Type**
    - The system will display a widget selection dialog
    - Ready to add the first widget
 

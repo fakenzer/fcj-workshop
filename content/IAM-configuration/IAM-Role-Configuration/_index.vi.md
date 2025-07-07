@@ -47,7 +47,7 @@ ResourceManagerRole được thiết kế để:
 
 ### Bước 3: Cấu hình Trusted Entity
 
-1. Trong phần "Trusted entity type", chọn **"Custom trust policy"**
+1. Trong phần **"Trusted entity type"**, chọn **"Custom trust policy"**
 2. Paste đoạn JSON trust policy sau vào ô văn bản:
 
 ```json
@@ -75,7 +75,7 @@ ResourceManagerRole được thiết kế để:
 
 ### Bước 4: Gán AWS Managed Policies
 
-Tại trang "Add permissions", tìm và chọn các AWS managed policies sau:
+Tại trang **"Add permissions"**, tìm và chọn các AWS managed policies sau:
 
 #### 4.1 Lambda và Execution
 
@@ -153,13 +153,13 @@ AmazonRDSFullAccess
 
 ### Bước 5: Gán Custom Policies
 
-1. Trong cùng trang "Add permissions", tìm kiếm **"ManageResourcePolicy"**
+1. Trong cùng trang **"Add permissions"**, tìm kiếm **"ManageResourcePolicy"**
 2. Đánh dấu chọn policy này
 3. Nhấp "Next" để chuyển sang bước cuối
 
 ### Bước 6: Hoàn tất Role
 
-1. Tại trang "Name, review and create", điền thông tin:
+1. Tại trang **"Name, review and create"**, điền thông tin:
 
    - **Role name**: `ResourceManagerRole`
    - **Description**: `Comprehensive role for resource management and automation`

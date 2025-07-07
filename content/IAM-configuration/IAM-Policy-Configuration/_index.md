@@ -1,5 +1,5 @@
 ---
-title: "Creating IAM Policies"
+title: "Create IAM Policies"
 weight: 1
 chapter: false
 pre: " <b> 2.1 </b> "
@@ -12,31 +12,33 @@ In this section, we will create two important custom policies:
 
 ## Policy 1: ManageResourcePolicy
 
-#### Purpose
+### Purpose
 
 This policy provides permissions to:
 
 - Manage tags for AWS resources
 - Control Step Functions workflows
 
-#### Steps to create the policy
+### Steps to create policy
 
-##### Step 1: Access IAM Console
+#### Step 1: Access IAM Console
 
 1. Log in to AWS Console
 2. Search for **"IAM"** in the search bar
-3. Select the IAM service
+3. Select IAM service
 
 ![Choose IAM Service](/images/2.IAM/001-Chooseiam.png)
 
-##### Step 2: Create new Policy
+#### Step 2: Create new Policy
 
 1. In the IAM interface, select **"Policies"** from the left menu
 2. Click **"Create policy"**
    ![Choose create policy](/images/2.IAM/002-choosecreatepolicy.png)
-3. Select the **"JSON"** tab instead of Visual editor
+3. Select **"JSON"** tab instead of Visual editor
 
-##### Step 3: Configure Policy JSON
+#### Step 3: Configure Policy JSON
+
+Copy and paste this JSON snippet.
 
 ```json
 {
@@ -57,55 +59,26 @@ This policy provides permissions to:
 }
 ```
 
-##### Step 4: Complete Policy
+#### Step 4: Complete Policy
 
 1. Click **"Next"** to review
-2. Fill in the information:
+2. Fill in information:
    - **Policy name**: `ManageResourcePolicy`
-   - **Description**: `Policy for managing resources, tags, budgets and Step Functions`
+   - **Description**: `Policy for managing resources, tags and Step Functions`
 3. Click **"Create policy"**
    ![Review policy](/images/2.IAM/003-reviewpolicy.png)
 
-#### Permission details in ManageResourcePolicy
-
-##### Tag Management Permissions
-
-```json
-"tag:GetResources"     // List resources and tags
-"tag:TagResources"     // Add tags to resources
-"tag:UntagResources"   // Remove tags from resources
-```
-
-**Usage**:
-
-- Automatically tag resources according to standards
-- Categorize resources by department/project
-- Track cost allocation
-
-##### Step Functions Permissions
-
-```json
-"states:StartExecution"    // Launch workflow
-"states:DescribeExecution" // Monitor workflow status
-```
-
-**Usage**:
-
-- Orchestrate complex workflows
-- Automate cost optimization tasks
-- Coordinate multiple AWS services
-
 ## Policy 2: RequireEnvironmentTagPolicy
 
-#### Purpose
+### Purpose
 
 This policy ensures:
 
-- All new resources must have an **"Environment"** tag
+- All new resources must have **"Environment"** tag
 - Only allows values: prod, dev, test, lab
 - Prevents creation of resources without tags
 
-#### Policy JSON Configuration
+### Policy JSON Configuration
 
 ```json
 {
@@ -136,19 +109,19 @@ This policy ensures:
 }
 ```
 
-#### Steps to create RequireEnvironmentTagPolicy
+### Steps to create RequireEnvironmentTagPolicy
 
-##### Step 1: Create new policy
+#### Step 1: Create new policy
 
 1. In IAM Console, select **"Policies"**
 2. Click **"Create policy"**
-3. Select the **"JSON"** tab
+3. Select **"JSON"** tab
 
-##### Step 2: Paste JSON policy
+#### Step 2: Paste JSON policy
 
 Copy and paste the RequireEnvironmentTagPolicy JSON above
 
-##### Step 3: Complete
+#### Step 3: Complete
 
 1. **Policy name**: `RequireEnvironmentTagPolicy`
 2. **Description**: `Enforce environment tag requirement for resource creation`

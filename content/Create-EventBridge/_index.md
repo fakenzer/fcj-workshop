@@ -5,25 +5,25 @@ chapter: false
 pre: " <b> 5. </b> "
 ---
 
-In this section, we will create an EventBridge Rule to automatically trigger the **ResourceManagementWorkflow** Step Functions on a scheduled basis.
+In this section, we will create an EventBridge Rule to automatically trigger the Step Functions **ResourceManagementWorkflow** on a periodic schedule.
 
 ## EventBridge Rule: ResourceManagementSchedule
 
 #### Purpose
 
-This EventBridge Rule will:
+This EventBridge Rule will perform:
 
 - Automatically trigger ResourceManagementWorkflow on schedule
 - Run daily compliance checks at 5:00 PM UTC
 - Send appropriate input parameters to Step Functions
 - Use IAM role automatically created by AWS to invoke Step Functions
-- Ensure stable workflow execution with monitoring capabilities
+- Ensure stable workflow execution that can be monitored
 
-#### Schedule
+#### Operation Schedule
 
 The rule will trigger the workflow:
 
-1. **Daily at 5:00 PM UTC** (12:00 AM Vietnam time)
+1. **Daily at 5:00 PM UTC** (0:00 AM Vietnam time)
 2. **Can be customized** according to organizational needs
 
 #### Steps to Create EventBridge Rule
@@ -39,7 +39,7 @@ The rule will trigger the workflow:
 
 1. In the sidebar, select **"Rules"**
 2. Click the **"Create rule"** button
-3. Ensure you're in the **"default"** Event bus
+3. Ensure you're on the **"default"** Event bus
 
 ##### Step 3: Configure Rule Definition
 
@@ -55,8 +55,8 @@ The rule will trigger the workflow:
 
 **Schedule pattern**:
 
-1. Choose "A schedule that runs at a regular rate, such as every 10 minutes"
-2. Or choose "A fine-grained schedule that runs at a specific time"
+1. Select "A schedule that runs at a regular rate, such as every 10 minutes"
+2. Or select "A fine-grained schedule that runs at a specific time"
 
 **Option 1: Cron Expression (Recommended)**
 
@@ -72,7 +72,7 @@ The rule will trigger the workflow:
 rate(1 day)
 ```
 
-- Runs every 24 hours from the first creation
+- Runs every 24 hours from the first time it was created
 
 ##### Step 5: Configure Target
 
@@ -84,9 +84,9 @@ rate(1 day)
 **Step Functions configuration**:
 
 - **State machine**: Select `ResourceManagementWorkflow`
-- **Execution role**: Choose **"Create a new role for this specific resource"**
+- **Execution role**: Choose **"Use existing role"**
 
-**AWS will automatically create a role with format**: `Amazon_EventBridge_Invoke_Step_Functions_Role_[random_id]`
+**Role name** select `ResourceManagerRole` that you created earlier
 ![Select target](/images/5.EventBridge/004-selecttarget.png)
 
 ##### Step 6: Configure Additional Settings
@@ -112,14 +112,14 @@ rate(1 day)
 
 EventBridge provides metrics:
 
-- **InvocationsCount**: Number of times rule is triggered
+- **InvocationsCount**: Number of times the rule was triggered
 - **SuccessfulInvocations**: Number of successful invocations
 - **FailedInvocations**: Number of failed invocations
 - **TargetErrors**: Errors when invoking target
 
 ##### CloudWatch Logs
 
-**EventBridge doesn't automatically log**, but can be enabled:
+**EventBridge doesn't automatically log**, but you can enable:
 
 ##### Step Functions Execution History
 
@@ -133,7 +133,7 @@ After EventBridge triggers:
 
 ##### Multiple Schedules
 
-Can create multiple rules for different use cases:
+You can create multiple rules for different use cases:
 
 ```json
 {
@@ -170,4 +170,4 @@ Add input conditions:
 }
 ```
 
-This EventBridge Rule ensures the resource management workflow runs automatically, consistently, and can be monitored effectively.
+This EventBridge Rule ensures that the resource management workflow runs automatically, consistently, and can be monitored effectively.

@@ -1,27 +1,27 @@
 ---
-title: "Creating ResourceDeleter Lambda Function"
-weight: 2
+title: "Create ResourceDeleter Lambda Function"
+weight: 4
 chapter: false
-pre: " <b> 3.2. </b> "
+pre: " <b> 3.4. </b> "
 ---
 
-In this section, we will create the **ResourceDeleter** Lambda function to automatically delete non-compliant AWS resources.
+In this section, we will create the **ResourceDeleter** Lambda function to automatically delete AWS resources that do not comply with regulations.
 
 ## Lambda Function: ResourceDeleter
 
-#### Purpose
+### Purpose
 
 This function will perform the following critical functions:
 
 - Receive resource information to be deleted from ResourceScanner
-- Execute resource deletion in proper order and process
+- Execute resource deletion in the correct order and process
 - Handle complex dependencies (such as RDS cluster instances)
 - Log detailed deletion process for audit and troubleshooting
 - Return success/failure results
 
-#### Supported Resource Types
+### Supported Resource Types
 
-ResourceDeleter can delete the following types of resources:
+ResourceDeleter can delete the following resource types:
 
 - **EC2 instances**: Terminate instances
 - **VPC**: Delete VPC (with dependency checks)
@@ -30,20 +30,20 @@ ResourceDeleter can delete the following types of resources:
 - **RDS clusters**: Delete cluster and all instances
 - **FSx file systems**: Delete file system
 
-#### Steps to Create Lambda Function
+### Steps to Create Lambda Function
 
-##### Step 1: Access Lambda Console
+#### Step 1: Access Lambda Console
 
-1. Log in to AWS Console
+1. Log into AWS Console
 2. Search for **"Lambda"** in the search bar
-3. Select Lambda service
+3. Select the Lambda service
 
-##### Step 2: Create New Function
+#### Step 2: Create New Function
 
-1. Click **"Create function"** button
+1. Click the **"Create function"** button
 2. Select **"Author from scratch"**
 
-##### Step 3: Configure Function
+#### Step 3: Configure Function
 
 **Function configuration**:
 
@@ -54,9 +54,9 @@ ResourceDeleter can delete the following types of resources:
 
 1. Find and click on **"Change default execution role"**
 2. Select **"Use an existing role"**
-3. In the dropdown, select the **"ResourceManagerRole"** created earlier
+3. In the dropdown, select the **"ResourceManagerRole"** role created earlier
 
-##### Step 4: Deploy Code
+#### Step 4: Deploy Code
 
 1. Click **"Create function"** to create the Lambda function
 2. Delete the existing sample code in the editor
@@ -68,211 +68,275 @@ import boto3
 from datetime import datetime
 from botocore.exceptions import ClientError
 import time
+import re
 
+def get_cluster_from_instance_arn(instance_arn):
+    """Convert instance ARN to cluster ARN"""
+    instance_name = instance_arn.split(':')[-1]
+    patterns = [
+        r'^(.+)-instance-\d+$',  # cluster-name-instance-1
+        r'^(.+)-\d+$',           # cluster-name-1
+        r'^(.+)-writer$',        # cluster-name-writer
+        r'^(.+)-reader$',        # cluster-name-reader
+        r'^(.+)-replica-\d+$',   # cluster-name-replica-1
+    ]
+    for pattern in patterns:
+        match = re.match(pattern, instance_name)
+        if match:
+            cluster_name = match.group(1)
+            cluster_arn = instance_arn.replace(':db:', ':cluster:').replace(instance_name, cluster_name)
+            return cluster_arn, cluster_name
+    return None, None
 
 def delete_rds_cluster_instances(rds_client, cluster_id, region):
-    """Delete all instances in a cluster before deleting the cluster"""
+    """Handle different RDS cluster deletion scenarios"""
     try:
-        print(f"[DEBUG] Checking for instances in cluster: {cluster_id}")
+        print(f"[DEBUG] Checking cluster details: {cluster_id}")
         response = rds_client.describe_db_clusters(DBClusterIdentifier=cluster_id)
         cluster = response['DBClusters'][0]
-
+        engine = cluster.get('Engine', '').lower()
+        engine_mode = cluster.get('EngineMode', '').lower()
         db_cluster_members = cluster.get('DBClusterMembers', [])
-        if not db_cluster_members:
-            print(f"[INFO] No instances found in cluster {cluster_id}")
+        cluster_status = cluster.get('Status', '').lower()
+
+        print(f"[DEBUG] Cluster engine: {engine}, mode: {engine_mode}, status: {cluster_status}, members: {len(db_cluster_members)}")
+
+        if cluster_status in ['deleting', 'deleted']:
+            print(f"[INFO] Cluster {cluster_id} is already being deleted")
             return True
 
-        print(f"[INFO] Found {len(db_cluster_members)} instances in cluster {cluster_id}")
+        # Aurora clusters: deleting cluster will auto-delete instances
+        is_aurora_cluster = (
+            engine.startswith('aurora') or
+            engine_mode in ['provisioned', 'serverless'] or
+            (engine in ['mysql', 'postgresql'] and len(db_cluster_members) > 0)
+        )
 
-        # Delete all instances in the cluster
+        if is_aurora_cluster:
+            print(f"[INFO] Aurora cluster detected - instances will be auto-deleted with cluster")
+            return True
+
+        # Non-Aurora clusters: delete instances first
+        print(f"[INFO] Non-Aurora cluster - deleting {len(db_cluster_members)} instances")
         for member in db_cluster_members:
             instance_id = member['DBInstanceIdentifier']
-            print(f"[DEBUG] Deleting cluster instance: {instance_id}")
+            print(f"[DEBUG] Deleting instance: {instance_id}")
             try:
                 rds_client.delete_db_instance(
                     DBInstanceIdentifier=instance_id,
                     SkipFinalSnapshot=True,
                     DeleteAutomatedBackups=True
                 )
-                print(f"[INFO] Initiated deletion of cluster instance: {instance_id}")
+                print(f"[INFO] Initiated deletion of instance: {instance_id}")
             except ClientError as e:
                 if 'InvalidDBInstanceState' in str(e):
                     print(f"[WARN] Instance {instance_id} already being deleted")
                 else:
+                    print(f"[ERROR] Failed to delete instance {instance_id}: {e}")
                     raise
 
         # Wait for instances to be deleted
-        if db_cluster_members:
-            print(f"[INFO] Waiting for {len(db_cluster_members)} instances to be deleted...")
-            max_wait = 300  # 5 minutes
-            wait_time = 0
-
-            while wait_time < max_wait:
-                try:
-                    response = rds_client.describe_db_clusters(DBClusterIdentifier=cluster_id)
-                    cluster = response['DBClusters'][0]
-                    remaining_instances = cluster.get('DBClusterMembers', [])
-
-                    if not remaining_instances:
-                        print("[INFO] All cluster instances deleted successfully")
-                        break
-
-                    print(f"[DEBUG] Still waiting for {len(remaining_instances)} instances to be deleted...")
-                    time.sleep(15)
-                    wait_time += 15
-
-                except ClientError as e:
-                    if 'DBClusterNotFoundFault' in str(e):
-                        print("[INFO] Cluster already deleted")
-                        return True
-                    raise
-
-            if wait_time >= max_wait:
-                print(f"[WARN] Timeout waiting for cluster instances to be deleted")
-                return False
-
-        return True
+        max_wait = 600
+        wait_time = 0
+        while wait_time < max_wait:
+            try:
+                response = rds_client.describe_db_clusters(DBClusterIdentifier=cluster_id)
+                remaining_instances = response['DBClusters'][0].get('DBClusterMembers', [])
+                if not remaining_instances:
+                    print("[INFO] All cluster instances deleted")
+                    return True
+                print(f"[DEBUG] Waiting for {len(remaining_instances)} instances to delete...")
+                time.sleep(30)
+                wait_time += 30
+            except ClientError as e:
+                if 'DBClusterNotFoundFault' in str(e):
+                    print("[INFO] Cluster already deleted")
+                    return True
+                raise
+        print(f"[WARN] Timeout waiting for instances to delete")
+        return False
 
     except ClientError as e:
         if 'DBClusterNotFoundFault' in str(e):
             print(f"[INFO] Cluster {cluster_id} not found")
             return True
+        print(f"[ERROR] Error handling cluster {cluster_id}: {e}")
         raise
 
+def empty_s3_bucket_with_tags(s3_client, s3_resource, bucket_name):
+    """Empty S3 bucket and remove all tags/configurations"""
+    try:
+        print(f"[DEBUG] Emptying S3 bucket: {bucket_name}")
+        bucket = s3_resource.Bucket(bucket_name)
+
+        # Delete all object versions and objects
+        try:
+            bucket.object_versions.delete()
+            bucket.objects.all().delete()
+            print(f"[DEBUG] Deleted all objects/versions from bucket: {bucket_name}")
+        except Exception as e:
+            print(f"[DEBUG] Error deleting objects: {e}")
+
+        # Remove bucket configurations
+        configs = [
+            ('tagging', s3_client.delete_bucket_tagging, 'NoSuchTagSet'),
+            ('policy', s3_client.delete_bucket_policy, 'NoSuchBucketPolicy'),
+            ('cors', s3_client.delete_bucket_cors, 'NoSuchCORSConfiguration'),
+            ('lifecycle', s3_client.delete_bucket_lifecycle, 'NoSuchLifecycleConfiguration'),
+            ('website', s3_client.delete_bucket_website, 'NoSuchWebsiteConfiguration'),
+            ('notification', s3_client.put_bucket_notification_configuration, None),
+            ('replication', s3_client.delete_bucket_replication, 'ReplicationConfigurationNotFoundError'),
+            ('versioning', lambda **kwargs: s3_client.put_bucket_versioning(
+                Bucket=bucket_name, VersioningConfiguration={'Status': ' reset to suspended'}), None),
+        ]
+
+        for config_name, delete_func, ignore_error in configs:
+            try:
+                if config_name == 'notification':
+                    delete_func(Bucket=bucket_name, NotificationConfiguration={})
+                elif config_name == 'versioning':
+                    delete_func()
+                else:
+                    delete_func(Bucket=bucket_name)
+                print(f"[DEBUG] Removed {config_name} from: {bucket_name}")
+            except ClientError as e:
+                if ignore_error and ignore_error in str(e):
+                    print(f"[DEBUG] No {config_name} found on: {bucket_name}")
+                else:
+                    print(f"[DEBUG] Error removing {config_name}: {e}")
+
+        return True
+    except Exception as e:
+        print(f"[ERROR] Error emptying bucket {bucket_name}: {e}")
+        return False
+
+def delete_vpc_dependencies(ec2_client, vpc_id):
+    """Delete VPC dependencies to allow VPC deletion"""
+    try:
+        print(f"[DEBUG] Checking VPC dependencies for: {vpc_id}")
+
+        # Subnets
+        subnets = ec2_client.describe_subnets(Filters=[{'Name': 'vpc-id', 'Values': [vpc_id]}])['Subnets']
+        for subnet in subnets:
+            subnet_id = subnet['SubnetId']
+            try:
+                ec2_client.delete_subnet(SubnetId=subnet_id)
+                print(f"[DEBUG] Deleted subnet: {subnet_id}")
+            except ClientError as e:
+                print(f"[WARN] Failed to delete subnet {subnet_id}: {e}")
+
+        # Security groups (except default)
+        security_groups = ec2_client.describe_security_groups(
+            Filters=[{'Name': 'vpc-id', 'Values': [vpc_id]}]
+        )['SecurityGroups']
+        for sg in [sg for sg in security_groups if sg['GroupName'] != 'default']:
+            try:
+                ec2_client.delete_security_group(GroupId=sg['GroupId'])
+                print(f"[DEBUG] Deleted security group: {sg['GroupId']}")
+            except ClientError as e:
+                print(f"[WARN] Failed to delete security group {sg['GroupId']}: {e}")
+
+        # Route tables (except main)
+        route_tables = ec2_client.describe_route_tables(
+            Filters=[{'Name': 'vpc-id', 'Values': [vpc_id]}]
+        )['RouteTables']
+        for rt in [rt for rt in route_tables if not any(assoc.get('Main') for assoc in rt.get('Associations', []))]:
+            try:
+                ec2_client.delete_route_table(RouteTableId=rt['RouteTableId'])
+                print(f"[DEBUG] Deleted route table: {rt['RouteTableId']}")
+            except ClientError as e:
+                print(f"[WARN] Failed to delete route table {rt['RouteTableId']}: {e}")
+
+        # Internet gateways
+        igws = ec2_client.describe_internet_gateways(
+            Filters=[{'Name': 'attachment.vpc-id', 'Values': [vpc_id]}]
+        )['InternetGateways']
+        for igw in igws:
+            igw_id = igw['InternetGatewayId']
+            try:
+                ec2_client.detach_internet_gateway(InternetGatewayId=igw_id, VpcId=vpc_id)
+                ec2_client.delete_internet_gateway(InternetGatewayId=igw_id)
+                print(f"[DEBUG] Deleted internet gateway: {igw_id}")
+            except ClientError as e:
+                print(f"[WARN] Failed to delete internet gateway {igw_id}: {e}")
+
+        # NAT gateways
+        nat_gws = ec2_client.describe_nat_gateways(
+            Filters=[{'Name': 'vpc-id', 'Values': [vpc_id]}]
+        )['NatGateways']
+        for ng in [ng for ng in nat_gws if ng['State'] not in ['deleted', 'deleting']]:
+            try:
+                ec2_client.delete_nat_gateway(NatGatewayId=ng['NatGatewayId'])
+                print(f"[DEBUG] Initiated deletion of NAT gateway: {ng['NatGatewayId']}")
+            except ClientError as e:
+                print(f"[WARN] Failed to delete NAT gateway {ng['NatGatewayId']}: {e}")
+
+        # Verify dependencies
+        dependencies = {
+            'subnets': len(subnets),
+            'security_groups': len([sg for sg in security_groups if sg['GroupName'] != 'default']),
+            'route_tables': len([rt for rt in route_tables if not any(assoc.get('Main') for assoc in rt.get('Associations', []))]),
+            'internet_gateways': len(igws),
+            'nat_gateways': len([ng for ng in nat_gws if ng['State'] not in ['deleted', 'deleting']])
+        }
+        total_deps = sum(dependencies.values())
+        print(f"[DEBUG] Remaining dependencies: {dependencies}")
+        return total_deps == 0
+
+    except Exception as e:
+        print(f"[ERROR] Error checking VPC dependencies: {e}")
+        return False
 
 def lambda_handler(event, context):
     print("[DEBUG] Lambda delete function triggered")
-    print(f"[DEBUG] Event received: {json.dumps(event)}")
+    print(f"[DEBUG] Event received: {json.dumps(event, indent=2)}")
 
     resource_arn = event.get('resource_arn')
-    if not resource_arn:
-        print("[ERROR] Missing resource_arn in event")
-        return {'statusCode': 400, 'error': 'No resource ARN provided'}
+    action = event.get('action')
+    extra_info = event.get('extra_info', {})
+    service = event.get('service')
+    region = event.get('region', 'us-east-1')
 
-    print(f"[INFO] Processing resource ARN: {resource_arn}")
+    if not resource_arn or not action:
+        print("[ERROR] Missing resource_arn or action in event")
+        return {'statusCode': 400, 'error': 'Missing resource_arn or action'}
+
+    print(f"[INFO] Processing resource ARN: {resource_arn}, Action: {action}, Service: {service}, Region: {region}")
+
+    if action != 'DELETE_IMMEDIATE':
+        print(f"[INFO] Skipping resource {resource_arn} - action is {action}")
+        return {'statusCode': 200, 'result': f"Skipped resource {resource_arn} - action not DELETE_IMMEDIATE"}
 
     try:
-        # Parse ARN to get region
         arn_parts = resource_arn.split(':')
-        region = arn_parts[3] if len(arn_parts) > 3 else 'us-east-1'
+        if len(arn_parts) < 6:
+            raise ValueError(f"Invalid ARN format: {resource_arn}")
 
-        # Initialize clients with proper region
-        ec2 = boto3.client('ec2', region_name=region)
-        s3 = boto3.client('s3', region_name=region)
-        rds = boto3.client('rds', region_name=region)
-        fsx = boto3.client('fsx', region_name=region)
+        service = arn_parts[2]
+        region = arn_parts[3] if arn_parts[3] else 'us-east-1'
+        resource_part = ':'.join(arn_parts[5:])
 
-        if ':ec2:' in resource_arn and 'instance/' in resource_arn:
-            # EC2 Instance
-            instance_id = resource_arn.split('/')[-1]
-            print(f"[DEBUG] Detected EC2 instance. ID: {instance_id}")
-            ec2.terminate_instances(InstanceIds=[instance_id])
-            result = f"Terminated EC2 instance: {instance_id}"
+        # Initialize clients
+        clients = {
+            'ec2': boto3.client('ec2', region_name=region),
+            's3': boto3.client('s3'),  # S3 is global
+            'rds': boto3.client('rds', region_name=region),
+            'fsx': boto3.client('fsx', region_name=region),
+        }
 
-        elif ':ec2:' in resource_arn and 'vpc/' in resource_arn:
-            # VPC
-            vpc_id = resource_arn.split('/')[-1]
-            print(f"[DEBUG] Detected VPC. ID: {vpc_id}")
-
-            # VPC deletion requires removing dependencies first
-            print("[DEBUG] Checking VPC dependencies...")
-
-            # Get VPC details
-            response = ec2.describe_vpcs(VpcIds=[vpc_id])
-            if not response['Vpcs']:
-                result = f"VPC {vpc_id} not found"
-            elif response['Vpcs'][0]['IsDefault']:
-                result = f"Cannot delete default VPC: {vpc_id}"
-            else:
-                # For now, just attempt deletion - in production you'd want to handle dependencies
-                try:
-                    ec2.delete_vpc(VpcId=vpc_id)
-                    result = f"Deleted VPC: {vpc_id}"
-                except ClientError as e:
-                    if 'DependencyViolation' in str(e):
-                        result = f"VPC {vpc_id} has dependencies - manual cleanup required"
-                    else:
-                        raise
-
-        elif ':s3:' in resource_arn:
-            # S3 Bucket
-            bucket_name = resource_arn.split(':::')[-1]
-            print(f"[DEBUG] Detected S3 bucket. Name: {bucket_name}")
-
-            # Get bucket region
-            try:
-                bucket_region = s3.get_bucket_location(Bucket=bucket_name)['LocationConstraint']
-                if bucket_region:
-                    s3 = boto3.client('s3', region_name=bucket_region)
-                    s3_resource = boto3.resource('s3', region_name=bucket_region)
-                else:
-                    s3_resource = boto3.resource('s3', region_name='us-east-1')
-            except:
-                s3_resource = boto3.resource('s3', region_name=region)
-
-            bucket = s3_resource.Bucket(bucket_name)
-
-            print("[DEBUG] Emptying S3 bucket contents")
-            bucket.objects.all().delete()
-            bucket.object_versions.all().delete()
-
-            print("[DEBUG] Deleting S3 bucket")
-            s3.delete_bucket(Bucket=bucket_name)
-            result = f"Deleted S3 bucket: {bucket_name}"
-
-        elif ':rds:' in resource_arn:
-            # RDS Database or Cluster
-            # ARN format: arn:aws:rds:region:account:db:instance-name or arn:aws:rds:region:account:cluster:cluster-name
-            arn_parts = resource_arn.split(':')
-            if len(arn_parts) >= 6:
-                resource_type = arn_parts[5]  # 'db' or 'cluster'
-                resource_identifier = arn_parts[6] if len(arn_parts) > 6 else arn_parts[5]
-
-                print(f"[DEBUG] RDS ARN parts: {arn_parts}")
-                print(f"[DEBUG] Resource type: {resource_type}, Identifier: {resource_identifier}")
-
-                if resource_type == 'db':
-                    # RDS Database Instance
-                    print(f"[DEBUG] Detected RDS instance. ID: {resource_identifier}")
-                    rds.delete_db_instance(
-                        DBInstanceIdentifier=resource_identifier,
-                        SkipFinalSnapshot=True,
-                        DeleteAutomatedBackups=True
-                    )
-                    result = f"Deleted RDS instance: {resource_identifier}"
-
-                elif resource_type == 'cluster':
-                    # RDS Cluster
-                    print(f"[DEBUG] Detected RDS cluster. ID: {resource_identifier}")
-
-                    # First, delete all instances in the cluster
-                    if delete_rds_cluster_instances(rds, resource_identifier, region):
-                        print(f"[DEBUG] Deleting RDS cluster: {resource_identifier}")
-                        rds.delete_db_cluster(
-                            DBClusterIdentifier=resource_identifier,
-                            SkipFinalSnapshot=True
-                        )
-                        result = f"Deleted RDS cluster and its instances: {resource_identifier}"
-                    else:
-                        result = f"Failed to delete all instances in cluster {resource_identifier}"
-                else:
-                    result = f"Unknown RDS resource type: {resource_type}"
-            else:
-                result = f"Invalid RDS ARN format: {resource_arn}"
-
-        elif ':fsx:' in resource_arn:
-            # FSx File System
-            file_system_id = resource_arn.split('/')[-1]
-            print(f"[DEBUG] Detected FSx file system. ID: {file_system_id}")
-            fsx.delete_file_system(FileSystemId=file_system_id)
-            result = f"Deleted FSx file system: {file_system_id}"
-
+        # Route to appropriate handler
+        if service == 'ec2':
+            result = handle_ec2_resource(clients['ec2'], resource_arn, resource_part)
+        elif service == 's3':
+            result = handle_s3_resource(clients['s3'], resource_arn, resource_part)
+        elif service == 'rds':
+            result = handle_rds_resource(clients['rds'], resource_arn, resource_part, region, extra_info)
+        elif service == 'fsx':
+            result = handle_fsx_resource(clients['fsx'], resource_arn, resource_part)
         else:
-            print("[WARN] Unsupported resource type")
-            result = f"Unsupported resource type: {resource_arn}"
+            result = f"Unsupported service: {service}"
 
         print(f"[SUCCESS] {result}")
-
         return {
             'statusCode': 200,
             'result': result,
@@ -284,118 +348,214 @@ def lambda_handler(event, context):
         error_code = e.response['Error']['Code']
         error_msg = f"AWS Error [{error_code}]: {str(e)}"
         print(f"[ERROR] {error_msg}")
-
         return {
             'statusCode': 500,
             'error': error_msg,
             'resource_arn': resource_arn,
             'error_code': error_code
         }
-
     except Exception as e:
         error_msg = f"Failed to delete {resource_arn}: {str(e)}"
         print(f"[ERROR] {error_msg}")
-
         return {
             'statusCode': 500,
             'error': error_msg,
             'resource_arn': resource_arn
         }
+
+def handle_ec2_resource(ec2_client, resource_arn, resource_part):
+    """Handle EC2 resource deletion"""
+    if 'instance/' in resource_part:
+        instance_id = resource_part.split('/')[-1]
+        print(f"[DEBUG] Deleting EC2 instance: {instance_id}")
+        try:
+            response = ec2_client.describe_instances(InstanceIds=[instance_id])
+            instance = response['Reservations'][0]['Instances'][0]
+            if instance['State']['Name'] in ['terminated', 'terminating']:
+                return f"EC2 instance {instance_id} is already {instance['State']['Name']}"
+            ec2_client.terminate_instances(InstanceIds=[instance_id])
+            return f"Terminated EC2 instance: {instance_id}"
+        except ClientError as e:
+            if 'InvalidInstanceID.NotFound' in str(e):
+                return f"EC2 instance {instance_id} not found"
+            raise
+
+    elif 'vpc/' in resource_part:
+        vpc_id = resource_part.split('/')[-1]
+        print(f"[DEBUG] Deleting VPC: {vpc_id}")
+        try:
+            response = ec2_client.describe_vpcs(VpcIds=[vpc_id])
+            vpc = response['Vpcs'][0]
+            if vpc['IsDefault']:
+                return f"Cannot delete default VPC: {vpc_id}"
+            if not delete_vpc_dependencies(ec2_client, vpc_id):
+                return f"VPC {vpc_id} has dependencies - manual cleanup required"
+            ec2_client.delete_vpc(VpcId=vpc_id)
+            return f"Deleted VPC: {vpc_id}"
+        except ClientError as e:
+            if 'InvalidVpcID.NotFound' in str(e):
+                return f"VPC {vpc_id} not found"
+            raise
+
+    return f"Unsupported EC2 resource type: {resource_part}"
+
+def handle_s3_resource(s3_client, resource_arn, resource_part):
+    """Handle S3 resource deletion"""
+    bucket_name = resource_part
+    print(f"[DEBUG] Deleting S3 bucket: {bucket_name}")
+
+    try:
+        s3_client.head_bucket(Bucket=bucket_name)
+        bucket_location = s3_client.get_bucket_location(Bucket=bucket_name)
+        bucket_region = bucket_location['LocationConstraint'] or 'us-east-1'
+        s3_regional = boto3.client('s3', region_name=bucket_region)
+        s3_resource = boto3.resource('s3', region_name=bucket_region)
+
+        if not empty_s3_bucket_with_tags(s3_regional, s3_resource, bucket_name):
+            return f"Failed to empty S3 bucket: {bucket_name}"
+
+        for attempt in range(3):
+            try:
+                s3_regional.delete_bucket(Bucket=bucket_name)
+                return f"Deleted S3 bucket: {bucket_name}"
+            except ClientError as e:
+                if 'BucketNotEmpty' in str(e) and attempt < 2:
+                    print(f"[DEBUG] Bucket still not empty, retrying in 10 seconds... (attempt {attempt + 1}/3)")
+                    time.sleep(10)
+                    continue
+                raise
+    except ClientError as e:
+        if e.response['Error']['Code'] == '404':
+            return f"S3 bucket {bucket_name} not found"
+        raise
+
+def handle_rds_resource(rds_client, resource_arn, resource_part, region, extra_info):
+    """Handle RDS resource deletion based on DeletionType"""
+    parts = resource_part.split(':')
+    if len(parts) < 2:
+        return f"Invalid RDS ARN format: {resource_arn}"
+
+    resource_type = parts[0]
+    resource_id = parts[1]
+    deletion_type = extra_info.get('deletion_type', 'unknown')
+
+    print(f"[DEBUG] RDS resource type: {resource_type}, id: {resource_id}, deletion_type: {deletion_type}")
+
+    if resource_type == 'db':
+        if deletion_type == 'cluster_member':
+            cluster_id = extra_info.get('cluster_identifier')
+            if cluster_id:
+                print(f"[INFO] Instance {resource_id} is part of cluster {cluster_id} - deleting cluster")
+                return handle_rds_cluster_deletion(rds_client, cluster_id, region)
+            else:
+                print(f"[WARN] Cluster member instance {resource_id} has no cluster_identifier - treating as standalone")
+                deletion_type = 'standalone'
+
+        if deletion_type == 'child':
+            print(f"[INFO] Read replica instance {resource_id} - deleting directly")
+        elif deletion_type == 'parent':
+            print(f"[INFO] Parent instance {resource_id} with replicas - checking replicas first")
+            try:
+                response = rds_client.describe_db_instances(DBInstanceIdentifier=resource_id)
+                instance = response['DBInstances'][0]
+                replicas = instance.get('ReadReplicaDBInstanceIdentifiers', [])
+                if replicas:
+                    print(f"[WARN] Cannot delete parent instance {resource_id} - has {len(replicas)} replicas")
+                    return f"Cannot delete parent instance {resource_id} - delete replicas first"
+            except ClientError as e:
+                if 'DBInstanceNotFound' in str(e):
+                    return f"RDS instance {resource_id} not found"
+                raise
+
+        # Handle standalone or child instance deletion
+        try:
+            response = rds_client.describe_db_instances(DBInstanceIdentifier=resource_id)
+            instance = response['DBInstances'][0]
+            if instance['DBInstanceStatus'] in ['deleting', 'deleted']:
+                return f"RDS instance {resource_id} is already {instance['DBInstanceStatus']}"
+
+            if instance.get('DeletionProtection', False):
+                print(f"[INFO] Disabling deletion protection for instance: {resource_id}")
+                rds_client.modify_db_instance(
+                    DBInstanceIdentifier=resource_id,
+                    DeletionProtection=False,
+                    ApplyImmediately=True
+                )
+                time.sleep(10)
+
+            rds_client.delete_db_instance(
+                DBInstanceIdentifier=resource_id,
+                SkipFinalSnapshot=True,
+                DeleteAutomatedBackups=True
+            )
+            return f"Deleted RDS instance: {resource_id}"
+        except ClientError as e:
+            if 'DBInstanceNotFound' in str(e):
+                return f"RDS instance {resource_id} not found"
+            raise
+
+    elif resource_type == 'cluster':
+        return handle_rds_cluster_deletion(rds_client, resource_id, region)
+
+    return f"Unknown RDS resource type: {resource_type}"
+
+def handle_rds_cluster_deletion(rds_client, cluster_id, region):
+    """Handle RDS cluster deletion"""
+    print(f"[DEBUG] Deleting RDS cluster: {cluster_id}")
+    try:
+        response = rds_client.describe_db_clusters(DBClusterIdentifier=cluster_id)
+        cluster = response['DBClusters'][0]
+        if cluster.get('DeletionProtection', False):
+            print(f"[INFO] Disabling deletion protection for cluster: {cluster_id}")
+            rds_client.modify_db_cluster(
+                DBClusterIdentifier=cluster_id,
+                DeletionProtection=False,
+                ApplyImmediately=True
+            )
+            time.sleep(10)
+
+        if not delete_rds_cluster_instances(rds_client, cluster_id, region):
+            return f"Failed to prepare cluster {cluster_id} for deletion"
+
+        for attempt in range(5):
+            try:
+                rds_client.delete_db_cluster(
+                    DBClusterIdentifier=cluster_id,
+                    SkipFinalSnapshot=True
+                )
+                return f"Deleted RDS cluster: {cluster_id}"
+            except ClientError as e:
+                if 'InvalidClusterStateFault' in str(e) and attempt < 4:
+                    wait_time = 60 * (attempt + 1)
+                    print(f"[WARN] Cluster not ready, retrying in {wait_time} seconds... (attempt {attempt + 1}/5)")
+                    time.sleep(wait_time)
+                    continue
+                elif 'DBClusterNotFoundFault' in str(e):
+                    return f"RDS cluster {cluster_id} was already deleted"
+                raise
+    except ClientError as e:
+        if 'DBClusterNotFoundFault' in str(e):
+            return f"RDS cluster {cluster_id} not found"
+        raise
+
+def handle_fsx_resource(fsx_client, resource_arn, resource_part):
+    """Handle FSx resource deletion"""
+    file_system_id = resource_part.split('/')[-1]
+    print(f"[DEBUG] Deleting FSx file system: {file_system_id}")
+    try:
+        fsx_client.delete_file_system(FileSystemId=file_system_id)
+        return f"Deleted FSx file system: {file_system_id}"
+    except ClientError as e:
+        if 'FileSystemNotFound' in str(e):
+            return f"FSx file system {file_system_id} not found"
+        raise
 ```
 
-4. Click **"Deploy"** button to deploy the code
+4. Click the **"Deploy"** button to deploy the code
 
-#### ResourceDeleter Function Details
+### Additional Configuration
 
-##### ARN Processing and Client Initialization
-
-The `lambda_handler()` function performs:
-
-**Parse ARN to determine region**:
-
-- Split ARN into components
-- Initialize AWS clients with correct region
-- Support fallback region if not determinable
-
-**Initialize clients by region**:
-
-- EC2 client for instances and VPCs
-- S3 client with region detection
-- RDS client for databases and clusters
-- FSx client for file systems
-
-##### Processing Each Resource Type
-
-**EC2 Instances**:
-
-- Use `terminate_instances()` API
-- Extract instance ID from ARN
-- Log termination process
-
-**VPC**:
-
-- Check VPC existence
-- Detect default VPC to avoid accidental deletion
-- Handle dependency violations
-- Require manual cleanup for complex VPCs
-
-**S3 Buckets**:
-
-- Auto-detect bucket region
-- Empty bucket contents and versions
-- Delete bucket after emptying
-- Handle cross-region buckets
-
-**RDS Instances**:
-
-- Skip final snapshot for speed
-- Delete automated backups
-- Simple handling for standalone instances
-
-**RDS Clusters**:
-
-- Delete all instances in cluster first
-- Wait for instances to be completely deleted
-- Timeout protection (5 minutes)
-- Delete cluster after instances are clean
-
-**FSx File Systems**:
-
-- Direct deletion with file system ID
-- Handle ARN format extraction
-
-##### Special Handling for RDS Clusters
-
-The `delete_rds_cluster_instances()` function performs:
-
-**Cluster members management**:
-
-- List all instances in cluster
-- Delete each instance with proper configuration
-- Handle cases where instance is already being deleted
-
-**Waiting mechanism**:
-
-- Wait for all instances to complete deletion
-- Check periodically every 15 seconds
-- Timeout after 5 minutes to avoid infinite loop
-- Proper error handling for cluster not found
-
-##### Logging and Error Handling
-
-The function provides comprehensive logging:
-
-```
-[DEBUG] - Detailed processing information
-[INFO] - Important deletion information
-[WARN] - Warnings about potential issues
-[ERROR] - Errors occurred during deletion
-[SUCCESS] - Confirmation when deletion successful
-```
-
-#### Additional Configuration
-
-##### Timeout and Memory Settings
+#### Timeout and Memory Settings
 
 Adjust for production environment:
 
@@ -403,7 +563,7 @@ Adjust for production environment:
 
    - Minimum 10 minutes for RDS clusters
    - 15 minutes for complex resources
-   - Increase if many dependencies exist
+   - Increase if there are many dependencies
 
 2. **Memory**:
 
@@ -420,7 +580,7 @@ Adjust for production environment:
 
 After completing this section, you will have:
 
-**ResourceDeleter Lambda Function** with capabilities to:
+**ResourceDeleter Lambda Function** with capabilities:
 
 - Delete 6 main AWS resource types
 - Handle complex dependencies (RDS clusters)
@@ -428,4 +588,4 @@ After completing this section, you will have:
 - Detailed logging for audit trails
 - Cross-region support
 
-This Lambda function will ensure resource deletion is performed safely, with control, and auditability.
+This Lambda function will ensure that resource deletion is performed safely, with control, and in an auditable manner.

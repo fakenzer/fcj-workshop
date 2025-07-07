@@ -1,8 +1,8 @@
 ---
 title: "Giới thiệu về workshop"
 weight: 1
-chapter: false
-draft: true
+chapter: true
+
 pre: " <b> 1. </b> "
 ---
 
@@ -16,7 +16,7 @@ Sơ đồ sau đây cung cấp một hình ảnh trực quan về các dịch v�
 
 Khi bạn đi qua workshop, bạn sẽ tìm hiểu chi tiết về các dịch vụ này và tìm thấy các tài nguyên giúp bạn nắm bắt chúng nhanh chóng.
 
-![Architecture Application Schema]()
+![Architecture Application Schema](/images/1.Introduce/001-architectdiagram.png)
 
 ### Những gì bạn sẽ đạt được
 

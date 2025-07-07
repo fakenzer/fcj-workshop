@@ -12,16 +12,16 @@ Trong phần này, chúng ta sẽ tạo hai custom policies quan trọng:
 
 ## Policy 1: ManageResourcePolicy
 
-#### Mục đích
+### Mục đích
 
 Policy này cung cấp quyền để:
 
 - Quản lý tags cho tài nguyên AWS
 - Điều khiển Step Functions workflows
 
-#### Các bước tạo policy
+### Các bước tạo policy
 
-##### Bước 1: Truy cập IAM Console
+#### Bước 1: Truy cập IAM Console
 
 1. Đăng nhập vào AWS Console
 2. Tìm kiếm **"IAM"** trong thanh tìm kiếm
@@ -29,14 +29,16 @@ Policy này cung cấp quyền để:
 
 ![Choose IAM Service](/images/2.IAM/001-Chooseiam.png)
 
-##### Bước 2: Tạo Policy mới
+#### Bước 2: Tạo Policy mới
 
 1. Trong giao diện IAM, chọn **"Policies"** từ menu bên trái
 2. Nhấp **"Create policy"**
    ![Choose create policy](/images/2.IAM/002-choosecreatepolicy.png)
 3. Chọn tab **"JSON"** thay vì Visual editor
 
-##### Bước 3: Cấu hình Policy JSON
+#### Bước 3: Cấu hình Policy JSON
+
+Sao chép và dán đoạn JSON này vào.
 
 ```json
 {
@@ -57,7 +59,7 @@ Policy này cung cấp quyền để:
 }
 ```
 
-##### Bước 4: Hoàn tất Policy
+#### Bước 4: Hoàn tất Policy
 
 1. Nhấp **"Next"** để review
 2. Điền thông tin:
@@ -66,38 +68,9 @@ Policy này cung cấp quyền để:
 3. Nhấp **"Create policy"**
    ![Review policy](/images/2.IAM/003-reviewpolicy.png)
 
-#### Chi tiết quyền trong ManageResourcePolicy
-
-##### Quyền quản lý Tags
-
-```json
-"tag:GetResources"     // Liệt kê tài nguyên và tags
-"tag:TagResources"     // Thêm tags vào tài nguyên
-"tag:UntagResources"   // Xóa tags khỏi tài nguyên
-```
-
-**Sử dụng**:
-
-- Tự động tag tài nguyên theo quy chuẩn
-- Phân loại tài nguyên theo department/project
-- Tracking cost allocation
-
-##### Quyền Step Functions
-
-```json
-"states:StartExecution"    // Khởi chạy workflow
-"states:DescribeExecution" // Theo dõi workflow status
-```
-
-**Sử dụng**:
-
-- Orchestrate complex workflows
-- Automate cost optimization tasks
-- Coordinate multiple AWS services
-
 ## Policy 2: RequireEnvironmentTagPolicy
 
-#### Mục đích
+### Mục đích
 
 Policy này đảm bảo:
 
@@ -105,7 +78,7 @@ Policy này đảm bảo:
 - Chỉ cho phép các giá trị: prod, dev, test, lab
 - Ngăn chặn tạo tài nguyên không có tag
 
-#### Cấu hình Policy JSON
+### Cấu hình Policy JSON
 
 ```json
 {
@@ -136,19 +109,19 @@ Policy này đảm bảo:
 }
 ```
 
-#### Các bước tạo RequireEnvironmentTagPolicy
+### Các bước tạo RequireEnvironmentTagPolicy
 
-##### Bước 1: Tạo policy mới
+#### Bước 1: Tạo policy mới
 
 1. Trong IAM Console, chọn **"Policies"**
 2. Nhấp **"Create policy"**
 3. Chọn tab **"JSON"**
 
-##### Bước 2: Paste JSON policy
+#### Bước 2: Paste JSON policy
 
-Copy và paste đoạn JSON RequireEnvironmentTagPolicy ở trên
+Sao chép và dán đoạn JSON RequireEnvironmentTagPolicy ở trên
 
-##### Bước 3: Hoàn tất
+#### Bước 3: Hoàn tất
 
 1. **Policy name**: `RequireEnvironmentTagPolicy`
 2. **Description**: `Enforce environment tag requirement for resource creation`

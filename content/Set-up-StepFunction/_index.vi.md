@@ -9,7 +9,7 @@ Trong phần này, chúng ta sẽ tạo Step Functions **ResourceManagementWorkf
 
 ## Step Functions: ResourceManagementWorkflow
 
-#### Mục đích
+### Mục đích
 
 Step Functions này sẽ điều phối toàn bộ workflow quản lý tài nguyên:
 
@@ -19,7 +19,7 @@ Step Functions này sẽ điều phối toàn bộ workflow quản lý tài nguy
 - Gửi thông báo cảnh báo hoặc xóa tài nguyên theo chính sách
 - Xử lý song song nhiều tài nguyên để tối ưu hiệu suất
 
-#### Luồng hoạt động
+### Luồng hoạt động
 
 Workflow thực hiện theo các bước:
 
@@ -30,28 +30,28 @@ Workflow thực hiện theo các bước:
 5. **DecideAction**: Phân loại hành động cần thực hiện
 6. **Execute Actions**: Thực hiện delete, warning, hoặc schedule delete
 
-#### Các loại Action
+### Các loại Action
 
-- **DELETE_IMMEDIATE**: Xóa ngay lập tức (tài nguyên không có tag Environment)
-- **SEND_WARNING**: Gửi cảnh báo (tài nguyên thiếu một số tag)
-- **NO_ACTION**: Chờ 48h rồi xóa (tài nguyên có tag Environment nhưng vi phạm khác)
+- **DELETE_IMMEDIATE**: Xóa ngay lập tức (tài nguyên có tag Environment là `lab`)
+- **SEND_WARNING**: Gửi cảnh báo (tài nguyên thiếu tag Environment)
+- **NO_ACTION**: Chờ 48h rồi xóa (tài nguyên có tag Environment nhưng không phải là `lab`)
 
-#### Các bước tạo Step Functions
+### Các bước tạo Step Functions
 
-##### Bước 1: Truy cập Step Functions Console
+#### Bước 1: Truy cập Step Functions Console
 
 1. Đăng nhập vào AWS Console
 2. Tìm kiếm **"Step Functions"** trong thanh tìm kiếm
 3. Chọn dịch vụ AWS Step Functions
    ![Step Functions](/images/4.StepFunctions/001-stepfunction.png)
 
-##### Bước 2: Tạo State Machine mới
+#### Bước 2: Tạo State Machine mới
 
 1. Nhấp vào nút **"Create state machine"**
 2. Chọn **"Write your workflow in code"**
 3. Chọn **"Standard"** state machine type
 
-##### Bước 3: Cấu hình State Machine
+#### Bước 3: Cấu hình State Machine
 
 **State machine configuration**:
 
@@ -59,25 +59,33 @@ Workflow thực hiện theo các bước:
 - **Type**: `Standard`
   ![Create Step Functions](/images/4.StepFunctions/002-createstepfunction.png)
 
-##### Bước 4: Definition Code
+#### Bước 4: Definition Code
 
 Paste đoạn JSON definition sau vào editor:
 
 ```json
 {
-  "Comment": "Resource Management Workflow",
+  "Comment": "Resource Management Workflow for scanning, notifying, and deleting multiple resources",
   "StartAt": "ScanResources",
   "States": {
     "ScanResources": {
       "Type": "Task",
       "Resource": "arn:aws:lambda:your-region:your-aws-id:function:ResourceScanner",
-      "Next": "CheckResourcesExist"
+      "ResultPath": "$.scan_result",
+      "Next": "CheckResourcesExist",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "HandleScanError"
+        }
+      ]
     },
     "CheckResourcesExist": {
       "Type": "Choice",
       "Choices": [
         {
-          "Variable": "$.resources",
+          "Variable": "$.scan_result.resources",
           "IsPresent": true,
           "Next": "CheckResourcesNotEmpty"
         }
@@ -88,30 +96,42 @@ Paste đoạn JSON definition sau vào editor:
       "Type": "Choice",
       "Choices": [
         {
-          "Variable": "$.resources[0]",
+          "Variable": "$.scan_result.resources[0]",
           "IsPresent": true,
-          "Next": "ProcessEachResource"
+          "Next": "ProcessResources"
         }
       ],
       "Default": "NoResourcesFound"
     },
     "NoResourcesFound": {
       "Type": "Pass",
-      "Result": {
+      "Parameters": {
         "message": "No resources found to process",
         "status": "completed"
       },
       "End": true
     },
-    "ProcessEachResource": {
+    "HandleScanError": {
+      "Type": "Pass",
+      "Parameters": {
+        "message": "Scan failed",
+        "status": "failed",
+        "error.$": "$.error"
+      },
+      "End": true
+    },
+    "ProcessResources": {
       "Type": "Map",
-      "ItemsPath": "$.resources",
+      "ItemsPath": "$.scan_result.resources",
       "MaxConcurrency": 10,
       "Parameters": {
         "resource_arn.$": "$$.Map.Item.Value.resource_arn",
         "action.$": "$$.Map.Item.Value.action",
         "tags.$": "$$.Map.Item.Value.tags",
         "details.$": "$$.Map.Item.Value.details",
+        "service.$": "$$.Map.Item.Value.service",
+        "region.$": "$$.Map.Item.Value.region",
+        "extra_info.$": "$$.Map.Item.Value.extra_info",
         "timestamp.$": "$$.Map.Item.Value.timestamp"
       },
       "Iterator": {
@@ -141,12 +161,29 @@ Paste đoạn JSON definition sau vào editor:
           "DeleteNow": {
             "Type": "Task",
             "Resource": "arn:aws:lambda:your-region:your-aws-id:function:ResourceDeleter",
-            "End": true
+            "End": true,
+            "Catch": [
+              {
+                "ErrorEquals": ["States.ALL"],
+                "ResultPath": "$.error",
+                "Next": "HandleDeleteError"
+              }
+            ]
           },
           "SendWarning": {
             "Type": "Task",
             "Resource": "arn:aws:lambda:your-region:your-aws-id:function:NotificationSender",
-            "End": true
+            "Parameters": {
+              "resources": ["$$.Map.Item.Value"]
+            },
+            "End": true,
+            "Catch": [
+              {
+                "ErrorEquals": ["States.ALL"],
+                "ResultPath": "$.error",
+                "Next": "HandleNotificationError"
+              }
+            ]
           },
           "WaitThenDelete": {
             "Type": "Wait",
@@ -156,14 +193,50 @@ Paste đoạn JSON definition sau vào editor:
           "DeleteScheduled": {
             "Type": "Task",
             "Resource": "arn:aws:lambda:your-region:your-aws-id:function:ResourceDeleter",
+            "End": true,
+            "Catch": [
+              {
+                "ErrorEquals": ["States.ALL"],
+                "ResultPath": "$.error",
+                "Next": "HandleScheduledDeleteError"
+              }
+            ]
+          },
+          "HandleDeleteError": {
+            "Type": "Pass",
+            "Parameters": {
+              "status": "failed",
+              "error.$": "$.error"
+            },
+            "End": true
+          },
+          "HandleNotificationError": {
+            "Type": "Pass",
+            "Parameters": {
+              "status": "failed",
+              "error.$": "$.error"
+            },
+            "End": true
+          },
+          "HandleScheduledDeleteError": {
+            "Type": "Pass",
+            "Parameters": {
+              "status": "failed",
+              "error.$": "$.error"
+            },
             "End": true
           },
           "NoAction": {
             "Type": "Pass",
+            "Parameters": {
+              "status": "skipped",
+              "message": "No action taken for resource"
+            },
             "End": true
           }
         }
       },
+      "ResultPath": "$.action_results",
       "End": true
     }
   }
@@ -175,13 +248,13 @@ Paste đoạn JSON definition sau vào editor:
 Thay thế `your-aws-id` bằng Account ID thực tế của bạn và thay thế `your-region` bằng region bạn dùng.
 {{%/notice%}}
 
-##### Bước 7: Review và Deploy
+#### Bước 7: Review và Deploy
 
 1. Review toàn bộ configuration
 2. Nhấp **"Create state machine"**
 3. Kiểm tra state machine được tạo thành công
 
-#### Performance Configuration
+### Performance Configuration
 
 - **MaxConcurrency**: 10 (xử lý song song tối đa 10 tài nguyên)
 - **Timeout**: 1 hour (đủ cho cả wait 48h của scheduled delete)

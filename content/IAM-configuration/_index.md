@@ -14,18 +14,18 @@ This chapter provides detailed guidance on creating and configuring custom IAM P
 - Create IAM Role that can be used by AWS services
 - Establish secure and efficient permission system for automation
 
-## Required Knowledge
+## Prerequisites
 
 - Basic understanding of AWS IAM
 - Experience working with AWS Console
-- Understanding of JSON format
-- Knowledge of AWS tagging best practices
+- Knowledge of JSON format
+- Understanding of AWS tagging best practices
 
-## Expected Results
+## Expected Outcomes
 
 After completing this chapter, you will have:
 
-- **ManageResourcePolicy**: IAM policy with permissions for resource, tag, and cost management
+- **ManageResourcePolicy**: IAM policy with resource management, tags, and cost permissions
 - **RequireEnvironmentTagPolicy**: Policy requiring mandatory environment tag
 - **ResourceManagerRole**: Comprehensive role that can be used for automation and resource management
 
@@ -33,6 +33,6 @@ After completing this chapter, you will have:
 
 - Always carefully review permissions before creating policies
 - Follow the **"least privilege"** principle when granting permissions
-- Regularly review and update policies according to actual needs
+- Regularly review and update policies based on actual needs
 - Backup policy and role configurations before making changes
 - Ensure all resources have appropriate **Environment** tags

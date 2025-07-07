@@ -84,7 +84,7 @@ rate(1 day)
 **Step Functions configuration**:
 
 - **State machine**: Chọn `ResourceManagementWorkflow`
-- **Execution role**: Chọn **"Create a new role for this specific resource"**
+- **Execution role**: Chọn **"Use existing role"**
 
 **AWS sẽ tự động tạo role với format**: `Amazon_EventBridge_Invoke_Step_Functions_Role_[random_id]`
 ![Select target](/images/5.EventBridge/004-selecttarget.png)

@@ -1,5 +1,5 @@
 ---
-title: "Creating IAM Role"
+title: "Create IAM Role"
 weight: 2
 chapter: false
 pre: " <b> 2.2 </b> "
@@ -36,18 +36,18 @@ ResourceManagerRole is designed to:
 1. In AWS Console, go to IAM service
 2. Find the left sidebar
 3. Click on **"Roles"**
-4. The IAM Roles management page will be displayed
+4. IAM Roles management page will be displayed
 
 ### Step 2: Create New Role
 
-1. Click the **"Create role"** button
-2. Navigate to the "Select trusted entity" page
+1. Click **"Create role"** button
+2. Navigate to "Select trusted entity" page
 
 ![Manage Resource Policy](/images/2.IAM/006-createrole.png)
 
 ### Step 3: Configure Trusted Entity
 
-1. In the "Trusted entity type" section, select **"Custom trust policy"**
+1. In **"Trusted entity type"** section, select **"Custom trust policy"**
 2. Paste the following JSON trust policy into the text box:
 
 ```json
@@ -73,9 +73,9 @@ ResourceManagerRole is designed to:
 
 3. Click "Next" to continue
 
-### Step 4: Assign AWS Managed Policies
+### Step 4: Attach AWS Managed Policies
 
-On the "Add permissions" page, find and select the following AWS managed policies:
+On the **"Add permissions"** page, search for and select the following AWS managed policies:
 
 #### 4.1 Lambda and Execution
 
@@ -83,7 +83,7 @@ On the "Add permissions" page, find and select the following AWS managed policie
 AWSLambdaBasicExecutionRole
 ```
 
-- Permission to write logs to CloudWatch
+- Permissions to write logs to CloudWatch
 - Required for Lambda functions
 
 #### 4.2 Notification Services
@@ -151,15 +151,15 @@ AmazonRDSFullAccess
 - Manage RDS instances
 - Snapshots and backups
 
-### Step 5: Assign Custom Policies
+### Step 5: Attach Custom Policies
 
-1. On the same "Add permissions" page, search for **"ManageResourcePolicy"**
-2. Check this policy
+1. On the same **"Add permissions"** page, search for **"ManageResourcePolicy"**
+2. Select this policy
 3. Click "Next" to move to the final step
 
 ### Step 6: Complete Role
 
-1. On the "Name, review and create" page, fill in the information:
+1. On the **"Name, review and create"** page, fill in the information:
 
    - **Role name**: `ResourceManagerRole`
    - **Description**: `Comprehensive role for resource management and automation`
@@ -167,9 +167,9 @@ AmazonRDSFullAccess
 2. Review the entire configuration:
 
    - Role name is correct
-   - Trust policy is properly configured
-   - All AWS managed policies are assigned
-   - Custom policy "ManageResourcePolicy" is assigned
+   - Trust policy is configured correctly
+   - All AWS managed policies are attached
+   - Custom policy "ManageResourcePolicy" is attached
      ![Review Role](/images/2.IAM/007-reviewrole.png)
 
 3. Click "Create role"
