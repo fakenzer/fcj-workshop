@@ -1,7 +1,7 @@
 ---
 title: "Workshop Introduction"
 weight: 1
-chapter: true
+chapter: false
 pre: " <b> 1. </b> "
 ---
 
