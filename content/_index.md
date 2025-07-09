@@ -1,5 +1,5 @@
 ---
-title: "Workshop Introduction"
+title: "AWS Workshop: Automatically Detecting and Eliminating Costs Using Tags"
 weight: 1
 chapter: false
 pre: " <b> 1. </b> "

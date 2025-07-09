@@ -1,5 +1,5 @@
 ---
-title: "Giới thiệu về workshop"
+title: "Workshop AWS Tìm và diệt các chi phí tự động bằng tag"
 weight: 1
 chapter: false
 pre: " <b> 1. </b> "
