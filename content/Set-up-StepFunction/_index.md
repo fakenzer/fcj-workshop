@@ -65,6 +65,7 @@ Paste the following JSON definition into the editor:
 
 ```json
 {
+  {
   "Comment": "Resource Management Workflow for scanning, notifying, and deleting multiple resources",
   "StartAt": "ScanResources",
   "States": {
@@ -75,7 +76,9 @@ Paste the following JSON definition into the editor:
       "Next": "CheckResourcesExist",
       "Catch": [
         {
-          "ErrorEquals": ["States.ALL"],
+          "ErrorEquals": [
+            "States.ALL"
+          ],
           "ResultPath": "$.error",
           "Next": "HandleScanError"
         }
@@ -164,7 +167,9 @@ Paste the following JSON definition into the editor:
             "End": true,
             "Catch": [
               {
-                "ErrorEquals": ["States.ALL"],
+                "ErrorEquals": [
+                  "States.ALL"
+                ],
                 "ResultPath": "$.error",
                 "Next": "HandleDeleteError"
               }
@@ -174,12 +179,14 @@ Paste the following JSON definition into the editor:
             "Type": "Task",
             "Resource": "arn:aws:lambda:your-region:your-aws-id:function:NotificationSender",
             "Parameters": {
-              "resources": ["$$.Map.Item.Value"]
+              "resources.$": "States.Array($)"
             },
             "End": true,
             "Catch": [
               {
-                "ErrorEquals": ["States.ALL"],
+                "ErrorEquals": [
+                  "States.ALL"
+                ],
                 "ResultPath": "$.error",
                 "Next": "HandleNotificationError"
               }
@@ -196,7 +203,9 @@ Paste the following JSON definition into the editor:
             "End": true,
             "Catch": [
               {
-                "ErrorEquals": ["States.ALL"],
+                "ErrorEquals": [
+                  "States.ALL"
+                ],
                 "ResultPath": "$.error",
                 "Next": "HandleScheduledDeleteError"
               }

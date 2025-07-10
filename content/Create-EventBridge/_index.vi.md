@@ -86,7 +86,7 @@ rate(1 day)
 - **State machine**: Chọn `ResourceManagementWorkflow`
 - **Execution role**: Chọn **"Use existing role"**
 
-**AWS sẽ tự động tạo role với format**: `Amazon_EventBridge_Invoke_Step_Functions_Role_[random_id]`
+**Role name** chọn `ResourceManagerRole` mà bạn đã tạo trước đó
 ![Select target](/images/5.EventBridge/004-selecttarget.png)
 
 ##### Bước 6: Cấu hình Additional Settings
